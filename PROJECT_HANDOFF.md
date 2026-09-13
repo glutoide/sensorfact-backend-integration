@@ -7,8 +7,14 @@ Public portfolio implementation of Sensorfact's Backend Engineer Technical Assig
 
 Original assignment: https://github.com/Sensorfactdev/backend-integration-assignment
 
-## Status
-Portfolio-complete implementation. The original mandatory scope plus both optional improvements are implemented on branch `quality/ten-out-of-ten` in PR #2 and verified by deterministic CI before final integration.
+## Final status
+Completed and portfolio-ready.
+
+PR #2 (`Raise Sensorfact assignment to portfolio-complete quality`) was squash-merged normally into `main` as:
+
+`91e0211216f817837057f42aab615a2f817834e7`
+
+That integrated code was verified on `main` by both deterministic CI and a real Blockchain.com live integration smoke test.
 
 ## Implemented
 - GraphQL query for energy consumption per transaction for a specific Bitcoin block.
@@ -34,22 +40,31 @@ Portfolio-complete implementation. The original mandatory scope plus both option
 
 ## Verification
 TDD evidence:
-- wallet tests were added before implementation and were observed failing in GitHub Actions;
-- implementation was then added and corrected until the complete suite passed.
+- wallet tests were added before implementation and observed failing in GitHub Actions;
+- wallet service/client/schema implementation was then added and corrected until the complete deterministic suite passed.
 
-Latest fully executed deterministic PR CI before this handoff update:
+Final integrated `main` verification for commit `91e0211216f817837057f42aab615a2f817834e7`:
+
+### CI — run #53 / id 34749597101
 - dependency install: success
 - Jest tests: success
 - TypeScript compile: success
 - production dependency audit: success
+- overall conclusion: success
 
-The live integration workflow is intentionally separate from deterministic CI. Final completion requires verifying both normal CI and `Live API Smoke` on the integrated `main` commit.
+### Live API Smoke — run #1 / id 34749597100
+- dependency install: success
+- real Blockchain.com latest-block/raw-block integration: success
+- real wallet pagination integration: success
+- overall conclusion: success
+
+The live smoke proves the production client/service path works against Blockchain.com rather than only mocked data.
 
 ## Git / PR history
 - Initial implementation branch: `feature/implementation`.
 - PR #1 was superseded by a squash-equivalent `main` commit after GitHub's draft-to-ready/merge API repeatedly failed.
 - Quality branch: `quality/ten-out-of-ten`.
-- PR #2: `Raise Sensorfact assignment to portfolio-complete quality`.
+- PR #2 was a normal non-draft PR and was successfully squash-merged through GitHub.
 
 An accidental temporary root file named `placeholder` was created during branch setup and immediately removed from `main`; it is not part of the project.
 
@@ -61,8 +76,6 @@ An accidental temporary root file named `placeholder` was created during branch 
 - Production dependency vulnerabilities at high/critical severity fail CI; development-only tooling is evaluated separately rather than forcing unsafe breaking upgrades.
 
 ## Continuation point
-If work resumes, first inspect the current `main` Actions runs. The desired terminal state is:
-1. PR #2 integrated into `main`;
-2. normal CI green on the current `main` SHA;
-3. `Live API Smoke` green on the same `main` code;
-4. no further implementation work required.
+No implementation work is required.
+
+If the project is revisited, first inspect the current `main` Actions runs and any new dependency/security advisories. Otherwise this repository should be treated as a completed portfolio case.
