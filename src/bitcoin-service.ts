@@ -51,12 +51,35 @@ export type WalletEnergy = {
   transactionCount: number
 }
 
+const DAILY_BLOCK_CONCURRENCY = 4
+
 function utcDayStartMs(date: Date): number {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
 }
 
 function isoDay(timeMs: number): string {
   return new Date(timeMs).toISOString().slice(0, 10)
+}
+
+async function mapWithConcurrency<T, R>(
+  values: T[],
+  concurrency: number,
+  mapper: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length)
+  let nextIndex = 0
+
+  async function worker() {
+    while (nextIndex < values.length) {
+      const index = nextIndex
+      nextIndex += 1
+      results[index] = await mapper(values[index])
+    }
+  }
+
+  const workerCount = Math.min(concurrency, values.length)
+  await Promise.all(Array.from({ length: workerCount }, () => worker()))
+  return results
 }
 
 export class BitcoinEnergyService {
@@ -93,11 +116,15 @@ export class BitcoinEnergyService {
     for (let offset = 0; offset < days; offset += 1) {
       const dayMs = currentDay - offset * 24 * 60 * 60 * 1000
       const refs = await this.client.getBlocksAt(dayMs)
+      const blocks = await mapWithConcurrency(
+        refs,
+        DAILY_BLOCK_CONCURRENCY,
+        ref => this.client.getBlock(ref.hash),
+      )
+
       let totalEnergyKwh = 0
       let transactionCount = 0
-
-      for (const ref of refs) {
-        const block = await this.client.getBlock(ref.hash)
+      for (const block of blocks) {
         transactionCount += block.tx.length
         totalEnergyKwh += block.tx.reduce(
           (sum, tx) => sum + transactionEnergyKwh(tx.size),
