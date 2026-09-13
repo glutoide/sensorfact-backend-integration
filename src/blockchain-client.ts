@@ -12,6 +12,10 @@ export type Sleep = (ms: number) => Promise<void>
 
 type HttpError = Error & { status?: number }
 
+const BLOCK_CACHE_LIMIT = 128
+const DAY_CACHE_LIMIT = 32
+const ADDRESS_PAGE_CACHE_LIMIT = 128
+
 export const requestJson: JsonRequester = (url: string) => new Promise((resolve, reject) => {
   const req = https.get(url, { headers: { accept: 'application/json' } }, res => {
     let body = ''
@@ -49,10 +53,16 @@ function shouldRetry(error: unknown): boolean {
 
 function asTransaction(value: unknown): RawTransaction {
   const candidate = value as Partial<RawTransaction>
-  if (!candidate || typeof candidate.hash !== 'string' || typeof candidate.size !== 'number') {
+  if (
+    !candidate ||
+    typeof candidate.hash !== 'string' ||
+    !candidate.hash ||
+    !Number.isSafeInteger(candidate.size) ||
+    (candidate.size as number) < 0
+  ) {
     throw new Error('Blockchain API returned an invalid transaction payload')
   }
-  return candidate as RawTransaction
+  return { hash: candidate.hash, size: candidate.size as number }
 }
 
 function asRawBlock(value: unknown): RawBlock {
@@ -60,14 +70,19 @@ function asRawBlock(value: unknown): RawBlock {
   if (
     !candidate ||
     typeof candidate.hash !== 'string' ||
-    typeof candidate.time !== 'number' ||
+    !candidate.hash ||
+    !Number.isSafeInteger(candidate.time) ||
+    (candidate.time as number) < 0 ||
     !Array.isArray(candidate.tx)
   ) {
     throw new Error('Blockchain API returned an invalid block payload')
   }
 
-  candidate.tx.forEach(asTransaction)
-  return candidate as RawBlock
+  return {
+    hash: candidate.hash,
+    time: candidate.time as number,
+    tx: candidate.tx.map(asTransaction),
+  }
 }
 
 function asBlockReferences(value: unknown): BlockReference[] {
@@ -81,7 +96,7 @@ function asBlockReferences(value: unknown): BlockReference[] {
 
   return source.map(item => {
     const candidate = item as Partial<BlockReference>
-    if (!candidate || typeof candidate.hash !== 'string') {
+    if (!candidate || typeof candidate.hash !== 'string' || !candidate.hash) {
       throw new Error('Blockchain API returned an invalid block reference')
     }
     return { hash: candidate.hash }
@@ -90,18 +105,31 @@ function asBlockReferences(value: unknown): BlockReference[] {
 
 function asAddressPage(value: unknown): AddressTransactionsPage {
   const candidate = value as { n_tx?: unknown; txs?: unknown } | null
-  if (!candidate || typeof candidate.n_tx !== 'number' || !Array.isArray(candidate.txs)) {
+  if (
+    !candidate ||
+    !Number.isSafeInteger(candidate.n_tx) ||
+    (candidate.n_tx as number) < 0 ||
+    !Array.isArray(candidate.txs)
+  ) {
     throw new Error('Blockchain API returned an invalid address payload')
   }
 
   try {
     return {
-      totalCount: candidate.n_tx,
+      totalCount: candidate.n_tx as number,
       transactions: candidate.txs.map(asTransaction),
     }
   } catch {
     throw new Error('Blockchain API returned an invalid address payload')
   }
+}
+
+function setBounded<K, V>(cache: Map<K, V>, key: K, value: V, limit: number): void {
+  if (!cache.has(key) && cache.size >= limit) {
+    const oldestKey = cache.keys().next().value as K | undefined
+    if (oldestKey !== undefined) cache.delete(oldestKey)
+  }
+  cache.set(key, value)
 }
 
 export class BlockchainInfoClient implements BlockchainClient {
@@ -122,7 +150,7 @@ export class BlockchainInfoClient implements BlockchainClient {
       this.requester(`https://blockchain.info/rawblock/${encodeURIComponent(hash)}`)
         .then(asRawBlock),
     )
-    this.blockCache.set(hash, pending)
+    setBounded(this.blockCache, hash, pending, BLOCK_CACHE_LIMIT)
 
     try {
       return await pending
@@ -140,7 +168,7 @@ export class BlockchainInfoClient implements BlockchainClient {
       this.requester(`https://blockchain.info/blocks/${timeMs}?format=json`)
         .then(asBlockReferences),
     )
-    this.dayCache.set(timeMs, pending)
+    setBounded(this.dayCache, timeMs, pending, DAY_CACHE_LIMIT)
 
     try {
       return await pending
@@ -160,7 +188,7 @@ export class BlockchainInfoClient implements BlockchainClient {
         `https://blockchain.info/rawaddr/${encodeURIComponent(address)}?limit=50&offset=${offset}`,
       ).then(asAddressPage),
     )
-    this.addressPageCache.set(key, pending)
+    setBounded(this.addressPageCache, key, pending, ADDRESS_PAGE_CACHE_LIMIT)
 
     try {
       return await pending
