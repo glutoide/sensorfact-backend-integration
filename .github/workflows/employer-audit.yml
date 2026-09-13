@@ -1,0 +1,44 @@
+name: Employer Audit
+
+on:
+  pull_request:
+
+jobs:
+  http-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - name: Start real serverless-offline HTTP server
+        run: |
+          npm start > /tmp/server.log 2>&1 &
+          echo $! > /tmp/server.pid
+          for i in $(seq 1 30); do
+            if curl -sS -o /dev/null http://127.0.0.1:4000/graphql; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/server.log
+          exit 1
+      - name: Mandatory block query over HTTP
+        run: |
+          HASH=$(curl -fsS https://blockchain.info/latestblock | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>process.stdout.write(JSON.parse(d).hash))")
+          BODY=$(node -e 'console.log(JSON.stringify({query:`query($hash:String!){blockEnergy(blockHash:$hash){hash totalEnergyKwh transactions{hash sizeBytes energyKwh}}}`,variables:{hash:process.argv[1]}}))' "$HASH")
+          curl -fsS -H 'content-type: application/json' -d "$BODY" http://127.0.0.1:4000/graphql > /tmp/block.json
+          node -e "const r=require('/tmp/block.json'); if(r.errors||r.data?.blockEnergy?.hash!=='$HASH'||!(r.data.blockEnergy.transactions.length>0)) process.exit(1)"
+      - name: Invalid input is returned as a GraphQL error
+        run: |
+          curl -fsS -H 'content-type: application/json' -d '{"query":"query { dailyEnergy(days: 0) { date totalEnergyKwh } }"}' http://127.0.0.1:4000/graphql > /tmp/invalid.json
+          node -e "const r=require('/tmp/invalid.json'); if(!Array.isArray(r.errors)||r.errors.length===0) process.exit(1)"
+      - name: Mandatory daily query over HTTP completes within Lambda budget
+        run: |
+          timeout 29s curl -fsS -H 'content-type: application/json' -d '{"query":"query { dailyEnergy(days: 1) { date totalEnergyKwh blockCount transactionCount } }"}' http://127.0.0.1:4000/graphql > /tmp/daily.json
+          node -e "const r=require('/tmp/daily.json'); const x=r.data?.dailyEnergy?.[0]; if(r.errors||!x||!(x.blockCount>=0)||!(x.transactionCount>=0)||!(x.totalEnergyKwh>=0)) process.exit(1)"
+      - name: Show server log on failure
+        if: failure()
+        run: cat /tmp/server.log
