@@ -49,7 +49,9 @@ The daily calculation requires a day block list followed by raw-block data becau
 - block/day/wallet-page caches are bounded, and external payloads are normalized to the fields used by the application before being retained;
 - wallet history follows `n_tx` using `limit=50` / `offset` pagination rather than silently truncating at the first page.
 
-The public Blockchain.com API may still rate-limit a large cold daily request, especially from shared cloud-runner IPs. A production multi-instance design should persist/precompute daily aggregates or use a shared cache instead of depending on a cold synchronous fan-out for every request.
+A cold multi-block day query can still be rate-limited by the anonymous Blockchain.com API. For this take-home, the implementation demonstrates bounded concurrency, retry/backoff, request de-duplication and explicit failure propagation rather than hiding the upstream constraint.
+
+For a production system, I would not fan out hundreds of public API calls on every GraphQL request. I would ingest/precompute completed UTC-day aggregates asynchronously into durable storage (for example DynamoDB/PostgreSQL), serve `dailyEnergy` from that materialized data, and refresh the current incomplete day separately. This keeps frontend latency independent of Blockchain.com rate limits and makes multi-instance scaling predictable.
 
 ## Run locally
 
@@ -94,7 +96,7 @@ query {
 }
 ```
 
-`days` must be a positive integer. Days are UTC calendar days and the current UTC day is included. The assignment does not define a maximum `x`, so the GraphQL contract does not impose an arbitrary cap; larger windows naturally require more external data and are more exposed to upstream rate limits.
+`days` must be a positive integer. Days are UTC calendar days and the current UTC day is included. Because the current day is still in progress, its value is a partial aggregate at query time. The assignment does not define a maximum `x`, so the GraphQL contract does not impose an arbitrary cap; larger windows naturally require more external data and are more exposed to upstream rate limits.
 
 ### Wallet energy
 
@@ -140,7 +142,7 @@ A separate **Live API Smoke** workflow calls the real Blockchain.com API for:
 - the current `latestblock` endpoint and its raw block;
 - a real Bitcoin address through the wallet pagination path.
 
-It runs on pushes to `main`, can be triggered manually, and runs weekly. Full cold-day aggregation is intentionally not used as a required CI smoke because anonymous Blockchain.com rate limiting can make that external scenario nondeterministic even when the application handles the response correctly.
+It runs on pushes to `main`, can be triggered manually, and runs weekly. Full cold-day aggregation is intentionally not used as a required CI smoke because anonymous Blockchain.com rate limiting makes that external scenario nondeterministic; deterministic service tests cover the full aggregation path while the live smoke verifies the real HTTP client against Blockchain.com.
 
 ## Dependency and security policy
 
@@ -153,3 +155,9 @@ npm audit --omit=dev --audit-level=high
 ```
 
 so high/critical vulnerabilities in shipped runtime dependencies fail verification. The Serverless v3 development toolchain has older transitive packages; upgrading that toolchain independently may require a Serverless major-version migration and is not mixed into the assignment's runtime logic.
+
+## Trade-offs to discuss in the interview
+
+- The take-home keeps caching process-local to stay small and dependency-light. A real multi-instance deployment needs shared durable aggregates/cache.
+- The current UTC day is intentionally included and therefore partial. If the product requires only completed days, the query boundary should start at the previous UTC day.
+- The Blockchain.com anonymous API is an external availability/rate-limit dependency; production ingestion should isolate the user-facing API from it.
