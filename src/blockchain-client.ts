@@ -62,11 +62,15 @@ function asRawBlock(value: unknown): RawBlock {
 }
 
 function asBlockReferences(value: unknown): BlockReference[] {
-  if (!Array.isArray(value)) {
+  const source = Array.isArray(value)
+    ? value
+    : (value as { blocks?: unknown[] } | null)?.blocks
+
+  if (!Array.isArray(source)) {
     throw new Error('Blockchain API returned an invalid day payload')
   }
 
-  return value.map(item => {
+  return source.map(item => {
     const candidate = item as Partial<BlockReference>
     if (!candidate || typeof candidate.hash !== 'string') {
       throw new Error('Blockchain API returned an invalid block reference')
