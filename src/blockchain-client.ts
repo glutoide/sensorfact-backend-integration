@@ -176,7 +176,7 @@ export class BlockchainInfoClient implements BlockchainClient {
         return await operation()
       } catch (error) {
         if (attempt === 2 || !shouldRetry(error)) throw error
-        await this.sleep(100 * 2 ** attempt)
+        await this.sleep(500 * 2 ** attempt)
       }
     }
 
