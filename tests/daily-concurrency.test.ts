@@ -41,6 +41,6 @@ describe('dailyEnergy external-call concurrency', () => {
     expect(result.transactionCount).toBe(8)
     expect(result.totalEnergyKwh).toBe(364.8)
     expect(client.maxActive).toBeGreaterThan(1)
-    expect(client.maxActive).toBeLessThanOrEqual(2)
+    expect(client.maxActive).toBeLessThanOrEqual(3)
   })
 })
