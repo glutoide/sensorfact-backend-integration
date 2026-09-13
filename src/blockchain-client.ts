@@ -171,11 +171,12 @@ export class BlockchainInfoClient implements BlockchainClient {
   }
 
   private async withRetries<T>(operation: () => Promise<T>): Promise<T> {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    const maxAttempts = 5
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       try {
         return await operation()
       } catch (error) {
-        if (attempt === 2 || !shouldRetry(error)) throw error
+        if (attempt === maxAttempts - 1 || !shouldRetry(error)) throw error
         await this.sleep(500 * 2 ** attempt)
       }
     }
