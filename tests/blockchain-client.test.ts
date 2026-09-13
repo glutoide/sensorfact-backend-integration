@@ -15,7 +15,7 @@ describe('BlockchainInfoClient', () => {
     expect(calls).toBe(1)
   })
 
-  it('retries a rate-limited request and parses the documented blocks wrapper', async () => {
+  it('retries a rate-limited request with a meaningful backoff', async () => {
     let calls = 0
     const request: JsonRequester = async () => {
       calls += 1
@@ -31,7 +31,7 @@ describe('BlockchainInfoClient', () => {
 
     await expect(client.getBlocksAt(123)).resolves.toEqual([{ hash: 'block-1' }])
     expect(calls).toBe(3)
-    expect(waits).toEqual([100, 200])
+    expect(waits).toEqual([500, 1000])
   })
 
   it('does not retry a permanent 4xx response', async () => {
