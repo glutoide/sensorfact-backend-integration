@@ -1,5 +1,11 @@
 import * as https from 'https'
-import { BlockReference, BlockchainClient, RawBlock } from './bitcoin-service'
+import {
+  AddressTransactionsPage,
+  BlockReference,
+  BlockchainClient,
+  RawBlock,
+  RawTransaction,
+} from './bitcoin-service'
 
 export type JsonRequester = (url: string) => Promise<unknown>
 export type Sleep = (ms: number) => Promise<void>
@@ -41,6 +47,14 @@ function shouldRetry(error: unknown): boolean {
   return status === 429 || (typeof status === 'number' && status >= 500)
 }
 
+function asTransaction(value: unknown): RawTransaction {
+  const candidate = value as Partial<RawTransaction>
+  if (!candidate || typeof candidate.hash !== 'string' || typeof candidate.size !== 'number') {
+    throw new Error('Blockchain API returned an invalid transaction payload')
+  }
+  return candidate as RawTransaction
+}
+
 function asRawBlock(value: unknown): RawBlock {
   const candidate = value as Partial<RawBlock>
   if (
@@ -52,12 +66,7 @@ function asRawBlock(value: unknown): RawBlock {
     throw new Error('Blockchain API returned an invalid block payload')
   }
 
-  for (const tx of candidate.tx) {
-    if (!tx || typeof tx.hash !== 'string' || typeof tx.size !== 'number') {
-      throw new Error('Blockchain API returned an invalid transaction payload')
-    }
-  }
-
+  candidate.tx.forEach(asTransaction)
   return candidate as RawBlock
 }
 
@@ -79,9 +88,26 @@ function asBlockReferences(value: unknown): BlockReference[] {
   })
 }
 
+function asAddressPage(value: unknown): AddressTransactionsPage {
+  const candidate = value as { n_tx?: unknown; txs?: unknown } | null
+  if (!candidate || typeof candidate.n_tx !== 'number' || !Array.isArray(candidate.txs)) {
+    throw new Error('Blockchain API returned an invalid address payload')
+  }
+
+  try {
+    return {
+      totalCount: candidate.n_tx,
+      transactions: candidate.txs.map(asTransaction),
+    }
+  } catch {
+    throw new Error('Blockchain API returned an invalid address payload')
+  }
+}
+
 export class BlockchainInfoClient implements BlockchainClient {
   private readonly blockCache = new Map<string, Promise<RawBlock>>()
   private readonly dayCache = new Map<number, Promise<BlockReference[]>>()
+  private readonly addressPageCache = new Map<string, Promise<AddressTransactionsPage>>()
 
   constructor(
     private readonly requester: JsonRequester = requestJson,
@@ -120,6 +146,26 @@ export class BlockchainInfoClient implements BlockchainClient {
       return await pending
     } catch (error) {
       this.dayCache.delete(timeMs)
+      throw error
+    }
+  }
+
+  async getAddressTransactions(address: string, offset: number): Promise<AddressTransactionsPage> {
+    const key = `${address}:${offset}`
+    const cached = this.addressPageCache.get(key)
+    if (cached) return cached
+
+    const pending = this.withRetries(() =>
+      this.requester(
+        `https://blockchain.info/rawaddr/${encodeURIComponent(address)}?limit=50&offset=${offset}`,
+      ).then(asAddressPage),
+    )
+    this.addressPageCache.set(key, pending)
+
+    try {
+      return await pending
+    } catch (error) {
+      this.addressPageCache.delete(key)
       throw error
     }
   }
