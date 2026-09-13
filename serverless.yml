@@ -4,7 +4,7 @@ configValidationMode: error
 
 provider:
   name: aws
-  runtime: nodejs16.x
+  runtime: nodejs20.x
   stage: ${opt:stage, 'dev'}
   region: eu-west-1
   lambdaHashingVersion: 20201221
@@ -18,10 +18,10 @@ plugins:
 
 custom:
   esbuild:
-    packager: yarn
+    packager: npm
     minify: false
     sourcemap: false
-    target: node16
+    target: node20
     watch:
       pattern: ['src/**/*.ts']
 
