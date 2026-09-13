@@ -2,7 +2,7 @@ import { SchemaComposer } from 'graphql-compose'
 import { BitcoinEnergyService } from './bitcoin-service'
 import { BlockchainInfoClient } from './blockchain-client'
 
-type EnergyService = Pick<BitcoinEnergyService, 'blockEnergy' | 'dailyEnergy'>
+type EnergyService = Pick<BitcoinEnergyService, 'blockEnergy' | 'dailyEnergy' | 'walletEnergy'>
 
 export function createSchema(service: EnergyService) {
   const schemaComposer = new SchemaComposer()
@@ -35,6 +35,15 @@ export function createSchema(service: EnergyService) {
     },
   })
 
+  const WalletEnergyTC = schemaComposer.createObjectTC({
+    name: 'WalletEnergy',
+    fields: {
+      address: 'String!',
+      totalEnergyKwh: 'Float!',
+      transactionCount: 'Int!',
+    },
+  })
+
   schemaComposer.Query.addFields({
     blockEnergy: {
       type: BlockEnergyTC.NonNull,
@@ -49,6 +58,13 @@ export function createSchema(service: EnergyService) {
         days: 'Int!',
       },
       resolve: (_source, args: { days: number }) => service.dailyEnergy(args.days),
+    },
+    walletEnergy: {
+      type: WalletEnergyTC.NonNull,
+      args: {
+        address: 'String!',
+      },
+      resolve: (_source, args: { address: string }) => service.walletEnergy(args.address),
     },
   })
 
