@@ -7,54 +7,62 @@ Public portfolio implementation of Sensorfact's Backend Engineer Technical Assig
 
 Original assignment: https://github.com/Sensorfactdev/backend-integration-assignment
 
-## Final status
-Completed and merged into `main` as squash-equivalent commit:
-
-`48711eaa4e6f9573067ce6a359c1da6d67f5c956`
-
-The implementation is portfolio-ready.
+## Status
+Portfolio-complete implementation. The original mandatory scope plus both optional improvements are implemented on branch `quality/ten-out-of-ten` in PR #2 and verified by deterministic CI before final integration.
 
 ## Implemented
 - GraphQL query for energy consumption per transaction for a specific Bitcoin block.
 - GraphQL query for total energy consumption per UTC day for the last `x` days.
+- GraphQL query for total energy consumption associated with a wallet address.
+- Wallet history pagination using Blockchain.com's `n_tx` plus `limit=50` / `offset`, so results are not silently truncated to the first page.
 - Assignment formula: `transaction size (bytes) × 4.56 kWh`.
-- Blockchain.com HTTP client.
-- Validation for external API payloads.
+- Blockchain.com HTTP client with external payload validation.
 - Retry policy for HTTP 429 and 5xx responses with short exponential backoff.
-- In-memory promise cache for block/day requests to reduce duplicate external calls.
-- Input validation for `days` (1–30).
+- In-memory promise cache for block/day/wallet-page requests.
+- Input validation for block hashes, wallet addresses, and `days` (1–30).
 - Floating-point normalization for public energy values.
 - Deterministic Jest tests with fake external data.
-- GraphQL contract tests.
+- GraphQL contract tests for block, daily, and wallet operations.
+- Opt-in live integration tests using the real Blockchain.com latest-block and wallet endpoints.
+- Separate `Live API Smoke` GitHub Actions workflow on pushes to `main`, manual dispatch, and weekly schedule.
 - TypeScript compilation check.
-- GitHub Actions CI.
+- Production dependency security gate: `npm audit --omit=dev --audit-level=high`.
 - Node.js 20 runtime.
-- Portfolio-focused README with architecture, GraphQL examples, decisions, limitations, and production improvements.
+- Modernized TypeScript/Jest/esbuild tooling while retaining Serverless Framework v3 and compatible `serverless-offline` 13.9.0.
+- Removed unused starter runtime dependencies.
+- Portfolio README documenting architecture, API examples, resilience, verification, and production trade-offs.
 
 ## Verification
-PR implementation CI was fully green before integration:
+TDD evidence:
+- wallet tests were added before implementation and were observed failing in GitHub Actions;
+- implementation was then added and corrected until the complete suite passed.
+
+Latest fully executed deterministic PR CI before this handoff update:
 - dependency install: success
 - Jest tests: success
 - TypeScript compile: success
+- production dependency audit: success
 
-After integration, `main` CI run #32 also completed successfully with all steps green.
+The live integration workflow is intentionally separate from deterministic CI. Final completion requires verifying both normal CI and `Live API Smoke` on the integrated `main` commit.
 
 ## Git / PR history
-Work branch: `feature/implementation`.
+- Initial implementation branch: `feature/implementation`.
+- PR #1 was superseded by a squash-equivalent `main` commit after GitHub's draft-to-ready/merge API repeatedly failed.
+- Quality branch: `quality/ten-out-of-ten`.
+- PR #2: `Raise Sensorfact assignment to portfolio-complete quality`.
 
-PR #1 was created as a draft during development. GitHub's draft-to-ready GraphQL mutation repeatedly failed with GitHub-side errors/timeouts, and the normal merge action also returned upstream errors. To finish without manual intervention, the already-green feature tree was used to create a single squash-equivalent commit with `main` as its parent, and `main` was fast-forwarded to that commit. PR #1 was then closed as superseded by the equivalent `main` commit. No code was lost or changed by this workaround.
+An accidental temporary root file named `placeholder` was created during branch setup and immediately removed from `main`; it is not part of the project.
 
-## Scope decision
-The optional wallet-address calculation from the assignment was intentionally not implemented. The assignment prioritizes the two mandatory requests and suggests a limited timebox. The client/service separation leaves a straightforward extension point if needed later.
-
-## Known notes
-- CI deliberately does not call the public Blockchain.com API; tests use deterministic fake data to avoid network/rate-limit flakiness.
-- Cache is process-local. For production across multiple Lambda instances, use a shared cache such as Redis or DynamoDB.
-- The starter dependency set contains older transitive packages; the assignment implementation itself is complete and CI-green, but a production modernization pass could upgrade the Serverless/GraphQL dependency stack separately.
+## Design decisions
+- Normal CI uses deterministic fake external data to avoid flaky builds.
+- Real external integration is covered by a separate live-smoke workflow so network/API availability cannot make ordinary unit verification nondeterministic.
+- Process-local caching is appropriate for the assignment; a production multi-instance deployment should use shared caching such as Redis or DynamoDB.
+- Serverless Framework v3 is retained to preserve the starter project's simple no-login local workflow; `serverless-offline` is pinned to a compatible v3-era release.
+- Production dependency vulnerabilities at high/critical severity fail CI; development-only tooling is evaluated separately rather than forcing unsafe breaking upgrades.
 
 ## Continuation point
-No implementation work is currently required.
-
-If this project is revisited, start by checking `main` CI and README. Good optional next steps would be either:
-1. add the wallet-address extension as a separate feature/PR; or
-2. modernize dependencies as a separate maintenance PR without mixing it with the completed assignment scope.
+If work resumes, first inspect the current `main` Actions runs. The desired terminal state is:
+1. PR #2 integrated into `main`;
+2. normal CI green on the current `main` SHA;
+3. `Live API Smoke` green on the same `main` code;
+4. no further implementation work required.
