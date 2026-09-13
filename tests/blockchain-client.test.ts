@@ -15,7 +15,49 @@ describe('BlockchainInfoClient', () => {
     expect(calls).toBe(1)
   })
 
-  it('retries a rate-limited request and parses the documented blocks wrapper', async () => {
+  it('normalizes raw blocks instead of retaining unrelated API payload data', async () => {
+    const client = new BlockchainInfoClient(async () => ({
+      hash: 'abc',
+      time: 1,
+      extraBlockField: { very: 'large' },
+      tx: [{ hash: 'tx', size: 10, inputs: [{ ignored: true }] }],
+    }), async () => undefined)
+
+    await expect(client.getBlock('abc')).resolves.toEqual({
+      hash: 'abc',
+      time: 1,
+      tx: [{ hash: 'tx', size: 10 }],
+    })
+  })
+
+  it.each([-1, 1.5])('rejects invalid transaction byte size %s', async size => {
+    const client = new BlockchainInfoClient(async () => ({
+      hash: 'abc',
+      time: 1,
+      tx: [{ hash: 'tx', size }],
+    }), async () => undefined)
+
+    await expect(client.getBlock('abc')).rejects.toThrow('invalid transaction payload')
+  })
+
+  it('keeps the warm block cache bounded', async () => {
+    let calls = 0
+    const request: JsonRequester = async url => {
+      calls += 1
+      const hash = decodeURIComponent(url.split('/rawblock/')[1])
+      return { hash, time: 1, tx: [] }
+    }
+    const client = new BlockchainInfoClient(request, async () => undefined)
+
+    for (let i = 0; i < 129; i += 1) {
+      await client.getBlock(`block-${i}`)
+    }
+    await client.getBlock('block-0')
+
+    expect(calls).toBe(130)
+  })
+
+  it('retries a rate-limited request with a meaningful backoff', async () => {
     let calls = 0
     const request: JsonRequester = async () => {
       calls += 1
@@ -31,7 +73,26 @@ describe('BlockchainInfoClient', () => {
 
     await expect(client.getBlocksAt(123)).resolves.toEqual([{ hash: 'block-1' }])
     expect(calls).toBe(3)
-    expect(waits).toEqual([100, 200])
+    expect(waits).toEqual([500, 1000])
+  })
+
+  it('recovers after a longer burst of 429 responses', async () => {
+    let calls = 0
+    const request: JsonRequester = async () => {
+      calls += 1
+      if (calls < 5) {
+        const error = new Error('rate limited') as Error & { status?: number }
+        error.status = 429
+        throw error
+      }
+      return { hash: 'abc', time: 1, tx: [] }
+    }
+    const waits: number[] = []
+    const client = new BlockchainInfoClient(request, async ms => { waits.push(ms) })
+
+    await expect(client.getBlock('abc')).resolves.toMatchObject({ hash: 'abc' })
+    expect(calls).toBe(5)
+    expect(waits).toEqual([500, 1000, 2000, 4000])
   })
 
   it('does not retry a permanent 4xx response', async () => {

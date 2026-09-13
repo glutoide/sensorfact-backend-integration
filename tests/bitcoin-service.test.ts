@@ -70,10 +70,17 @@ describe('BitcoinEnergyService', () => {
     ])
   })
 
-  it('rejects invalid day windows before calling the external API', async () => {
+  it('rejects non-positive or non-integer day windows', async () => {
     const service = new BitcoinEnergyService(new FakeBlockchainClient({}, {}))
 
-    await expect(service.dailyEnergy(0)).rejects.toThrow('days must be between 1 and 30')
-    await expect(service.dailyEnergy(31)).rejects.toThrow('days must be between 1 and 30')
+    await expect(service.dailyEnergy(0)).rejects.toThrow('days must be a positive integer')
+    await expect(service.dailyEnergy(-1)).rejects.toThrow('days must be a positive integer')
+    await expect(service.dailyEnergy(1.5)).rejects.toThrow('days must be a positive integer')
+  })
+
+  it('does not impose an undocumented maximum on x days', async () => {
+    const service = new BitcoinEnergyService(new FakeBlockchainClient({}, {}))
+    await expect(service.dailyEnergy(31, new Date('2026-09-13T12:00:00.000Z')))
+      .resolves.toHaveLength(31)
   })
 })
