@@ -106,8 +106,8 @@ export class BitcoinEnergyService {
   }
 
   async dailyEnergy(days: number, now = new Date()): Promise<DailyEnergy[]> {
-    if (!Number.isInteger(days) || days < 1 || days > 30) {
-      throw new Error('days must be between 1 and 30')
+    if (!Number.isInteger(days) || days < 1) {
+      throw new Error('days must be a positive integer')
     }
 
     const currentDay = utcDayStartMs(now)
