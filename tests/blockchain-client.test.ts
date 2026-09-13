@@ -34,6 +34,25 @@ describe('BlockchainInfoClient', () => {
     expect(waits).toEqual([500, 1000])
   })
 
+  it('recovers after a longer burst of 429 responses', async () => {
+    let calls = 0
+    const request: JsonRequester = async () => {
+      calls += 1
+      if (calls < 5) {
+        const error = new Error('rate limited') as Error & { status?: number }
+        error.status = 429
+        throw error
+      }
+      return { hash: 'abc', time: 1, tx: [] }
+    }
+    const waits: number[] = []
+    const client = new BlockchainInfoClient(request, async ms => { waits.push(ms) })
+
+    await expect(client.getBlock('abc')).resolves.toMatchObject({ hash: 'abc' })
+    expect(calls).toBe(5)
+    expect(waits).toEqual([500, 1000, 2000, 4000])
+  })
+
   it('does not retry a permanent 4xx response', async () => {
     let calls = 0
     const request: JsonRequester = async () => {
