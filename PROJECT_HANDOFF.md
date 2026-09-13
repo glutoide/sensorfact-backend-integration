@@ -1,5 +1,7 @@
 # PROJECT_HANDOFF
 
+Updated: 2026-09-13
+
 ## Project
 `glutoide/sensorfact-backend-integration`
 
