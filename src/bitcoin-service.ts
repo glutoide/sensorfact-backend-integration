@@ -51,7 +51,7 @@ export type WalletEnergy = {
   transactionCount: number
 }
 
-const DAILY_BLOCK_CONCURRENCY = 2
+const DAILY_BLOCK_CONCURRENCY = 3
 
 function utcDayStartMs(date: Date): number {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
