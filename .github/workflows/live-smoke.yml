@@ -1,0 +1,23 @@
+name: Live API Smoke
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  schedule:
+    - cron: '17 7 * * 1'
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - name: Run live Blockchain.com integration smoke
+        env:
+          RUN_LIVE_SMOKE: '1'
+        run: npm test -- tests/live-smoke.test.ts --runInBand

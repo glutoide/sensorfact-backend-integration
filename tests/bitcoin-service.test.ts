@@ -1,4 +1,9 @@
-import { BitcoinEnergyService, BlockchainClient, RawBlock } from '../src/bitcoin-service'
+import {
+  AddressTransactionsPage,
+  BitcoinEnergyService,
+  BlockchainClient,
+  RawBlock,
+} from '../src/bitcoin-service'
 
 const block = (hash: string, sizes: number[], time = 1_700_000_000): RawBlock => ({
   hash,
@@ -20,6 +25,10 @@ class FakeBlockchainClient implements BlockchainClient {
 
   async getBlocksAt(timeMs: number): Promise<{ hash: string }[]> {
     return this.days[timeMs] ?? []
+  }
+
+  async getAddressTransactions(_address: string, _offset: number): Promise<AddressTransactionsPage> {
+    return { totalCount: 0, transactions: [] }
   }
 }
 

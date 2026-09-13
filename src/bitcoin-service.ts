@@ -15,9 +15,15 @@ export type BlockReference = {
   hash: string
 }
 
+export type AddressTransactionsPage = {
+  totalCount: number
+  transactions: RawTransaction[]
+}
+
 export interface BlockchainClient {
   getBlock(hash: string): Promise<RawBlock>
   getBlocksAt(timeMs: number): Promise<BlockReference[]>
+  getAddressTransactions(address: string, offset: number): Promise<AddressTransactionsPage>
 }
 
 export type TransactionEnergy = {
@@ -36,6 +42,12 @@ export type DailyEnergy = {
   date: string
   totalEnergyKwh: number
   blockCount: number
+  transactionCount: number
+}
+
+export type WalletEnergy = {
+  address: string
+  totalEnergyKwh: number
   transactionCount: number
 }
 
@@ -102,5 +114,37 @@ export class BitcoinEnergyService {
     }
 
     return results
+  }
+
+  async walletEnergy(address: string): Promise<WalletEnergy> {
+    const cleanAddress = address.trim()
+    if (!cleanAddress) throw new Error('wallet address is required')
+
+    let offset = 0
+    let totalCount = Number.POSITIVE_INFINITY
+    let totalEnergyKwh = 0
+    let transactionCount = 0
+
+    while (offset < totalCount) {
+      const page = await this.client.getAddressTransactions(cleanAddress, offset)
+      totalCount = page.totalCount
+
+      if (page.transactions.length === 0 && offset < totalCount) {
+        throw new Error('Blockchain API pagination ended before n_tx')
+      }
+
+      transactionCount += page.transactions.length
+      totalEnergyKwh += page.transactions.reduce(
+        (sum, tx) => sum + transactionEnergyKwh(tx.size),
+        0,
+      )
+      offset += page.transactions.length
+    }
+
+    return {
+      address: cleanAddress,
+      transactionCount,
+      totalEnergyKwh: roundEnergyKwh(totalEnergyKwh),
+    }
   }
 }

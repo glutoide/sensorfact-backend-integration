@@ -10,6 +10,7 @@ describe('GraphQL schema', () => {
         transactions: [{ hash: 'tx1', sizeBytes: 30, energyKwh: 136.8 }],
       }),
       dailyEnergy: async () => [],
+      walletEnergy: async () => ({ address: '', totalEnergyKwh: 0, transactionCount: 0 }),
     }
     const schema = createSchema(service)
 
@@ -37,6 +38,7 @@ describe('GraphQL schema', () => {
         blockCount: 2,
         transactionCount: 3,
       }],
+      walletEnergy: async () => ({ address: '', totalEnergyKwh: 0, transactionCount: 0 }),
     }
     const schema = createSchema(service)
 
