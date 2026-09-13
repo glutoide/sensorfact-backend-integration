@@ -15,7 +15,7 @@ describe('BlockchainInfoClient', () => {
     expect(calls).toBe(1)
   })
 
-  it('retries a rate-limited request and then succeeds', async () => {
+  it('retries a rate-limited request and parses the documented blocks wrapper', async () => {
     let calls = 0
     const request: JsonRequester = async () => {
       calls += 1
@@ -24,7 +24,7 @@ describe('BlockchainInfoClient', () => {
         error.status = 429
         throw error
       }
-      return [{ hash: 'block-1' }]
+      return { blocks: [{ hash: 'block-1' }] }
     }
     const waits: number[] = []
     const client = new BlockchainInfoClient(request, async ms => { waits.push(ms) })
