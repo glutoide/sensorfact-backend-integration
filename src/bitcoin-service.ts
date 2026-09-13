@@ -1,4 +1,4 @@
-import { transactionEnergyKwh } from './energy'
+import { roundEnergyKwh, transactionEnergyKwh } from './energy'
 
 export type RawTransaction = {
   hash: string
@@ -63,7 +63,9 @@ export class BitcoinEnergyService {
 
     return {
       hash: block.hash,
-      totalEnergyKwh: transactions.reduce((sum, tx) => sum + tx.energyKwh, 0),
+      totalEnergyKwh: roundEnergyKwh(
+        transactions.reduce((sum, tx) => sum + tx.energyKwh, 0),
+      ),
       transactions,
     }
   }
@@ -93,7 +95,7 @@ export class BitcoinEnergyService {
 
       results.push({
         date: isoDay(dayMs),
-        totalEnergyKwh,
+        totalEnergyKwh: roundEnergyKwh(totalEnergyKwh),
         blockCount: refs.length,
         transactionCount,
       })
