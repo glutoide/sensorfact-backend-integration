@@ -10,6 +10,7 @@ on:
 
 jobs:
   live-smoke:
+    if: ${{ false }} # GitHub-hosted spending disabled pending self-hosted port
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
