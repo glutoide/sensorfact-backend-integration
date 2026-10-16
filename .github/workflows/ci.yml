@@ -6,11 +6,21 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   verify:
+    # Never execute code from an untrusted fork on the owner's home laptop.
+    if: >-
+      github.actor == 'glutoide' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: [self-hosted, Windows, X64, glutoide-pool]
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 20
