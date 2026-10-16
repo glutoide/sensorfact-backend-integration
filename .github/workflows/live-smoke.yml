@@ -10,8 +10,7 @@ on:
 
 jobs:
   live-smoke:
-    if: ${{ false }} # GitHub-hosted spending disabled pending self-hosted port
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64, glutoide-pool]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
